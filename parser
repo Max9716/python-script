@@ -1,0 +1,121 @@
+import requests
+import xml.etree.ElementTree as ET
+import datetime
+
+url = 'https://sso.profitbase.ru/api/oauth2/token'
+headers = {
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 YaBrowser/25.2.0.0 Safari/537.36",
+    "x-tenant-id": "17670",
+    "referer": "https://moinaco.ru"
+}
+data = {
+    "client_id": "site_widget",
+    "client_secret": "site_widget",
+    "grant_type": "site_widget"
+}
+response = requests.post(url, headers=headers, data=data)
+response.encoding = 'utf-8'
+cook = response.json()["access_token"]
+
+
+headers = {
+    "authorization": f"Bearer {cook}"
+}
+
+def floor(x, y):
+    url = f'https://pb17670.profitbase.ru/api/v4/json/floor?houseId={x}'
+    response = requests.get(url, headers=headers)
+    response.encoding = 'utf-8'
+    try:
+        soup = response.json()
+        for a in soup:
+            if a["number"] == y:
+                return a["images"]["source"]
+    except:
+        pass
+
+def poisk(y):
+    flat1 = {}
+    flat1["flat_id"] = y["id"]
+    flat1["number"] = y["number"]
+    flat1["numberE"] = y["attributes"]["position_on_floor"]
+    flat1["complex"] = y["projectName"]
+    flat1["complex_id"] = y["projectName"]
+    flat1["house"] = y["houseName"]
+    flat1["house_id"] = y["house_id"]
+    flat1["floor"] = y["floor"]
+    flat1["section"] = y["sectionName"]
+    flat1["rooms"] = y["rooms_amount"]
+    flat1["type_room"] = "Квартира "+str(y["rooms_amount"])
+    flat1["price"] = y["price"]["value"]
+    flat1["price_base"] = y["price"]["value"]
+    flat1["area"] = y["area"]["area_total"]
+    flat1["status"] = y["status"]
+    try:
+        flat1["plan"] = y["planImages"][0]["source"]
+    except:
+        flat1["plan"] = ""
+    try:
+        flat1["floor_plan"] = floor(y["house_id"], y["floor"])
+    except:
+        flat1["floor_plan"] = ""
+    return flat1
+
+date = datetime.datetime.now()
+date = str(date)[:19]
+root = ET.Element('root', date=date)
+
+flat2 = []
+for i in range(0, 1500, 75):
+    url = f'https://pb17670.profitbase.ru/api/v4/json/property?isHouseFinished=0&status%5B0%5D=AVAILABLE&limit=75&offset={i}&full=true&returnFilteredCount=true'
+    response = requests.get(url, headers=headers)
+    response.encoding = 'utf-8'
+    try:
+        soup = response.json()["data"]["properties"]
+        for a in soup:
+            flat2.append(a)
+    except:
+        break
+
+flat = [poisk(y) for y in flat2]
+
+for l in flat:
+    flatID = ET.SubElement(root, "Квартира", id=str(l["flat_id"]))
+    nom = ET.SubElement(flatID, "Номер")
+    nomE = ET.SubElement(flatID, "НомерНаЭтаже")
+    komp = ET.SubElement(flatID, "Комплекс")
+    kompid = ET.SubElement(flatID, "КомплексID")
+    korp = ET.SubElement(flatID, "Корпус")
+    korpid = ET.SubElement(flatID, "КорпусID")
+    etz = ET.SubElement(flatID, "Этаж")
+    sec = ET.SubElement(flatID, "Секция")
+    room = ET.SubElement(flatID, "Комнат")
+    type = ET.SubElement(flatID, "ТипПомещений")
+    sale = ET.SubElement(flatID, "СтоимостьСоСкидкой")
+    salebase = ET.SubElement(flatID, "СтоимостьБазовая")
+    sq = ET.SubElement(flatID, "Площадь")
+    st = ET.SubElement(flatID, "Статус")
+    Plan = ET.SubElement(flatID, "Планировка")
+    floor_plan = ET.SubElement(flatID, "Поэтажка")
+    nom.text = str(l["number"])
+    nomE.text = str(l["numberE"])
+    komp.text = str(l["complex"])
+    kompid.text = str(l["complex_id"])
+    korp.text = str(l["house"])
+    korpid.text = str(l["house_id"])
+    etz.text = str(l["floor"])
+    sec.text = str(l["section"])
+    room.text = str(l["rooms"])
+    type.text = str(l["type_room"])
+    sale.text = str(l["price"])
+    salebase.text = str(l["price_base"])
+    sq.text = str(l["area"])
+    st.text = str(l["status"])
+    Plan.text = str(l["plan"])
+    floor_plan.text = str(l["floor_plan"])
+mydata = ET.tostring(root, encoding='utf-8')
+with open("moinaco.xml", "wb") as myfile:
+    myfile.write(mydata)
+
+
+
